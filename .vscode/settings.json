@@ -1,0 +1,18 @@
+{
+    "files.exclude": {
+        "**/.pio": true,
+        "**/.vscode": true,
+        "**/.git": true
+    },
+    "platformio.ini": "file:///platformio.ini",
+    "files.associations": {
+        "array": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp"
+    }
+}
