@@ -12,6 +12,7 @@ extern int lastDisplayedPrayerIndex;
 extern bool prayerTimeDisplayed;
 extern String currentPrayerTimeToDisplay;
 extern String prayerName;
+extern bool prayerDataUpdated;
 void fetchPrayerTimes();
 void playAzaan(int trackNumber);
 void checkAndTriggerAzaan();
@@ -21,5 +22,6 @@ void fetchAzaanTimes();
 void displayNextPrayerTime();
 int getCurrentPrayerIndex();
 String getCurrentPrayerName();
+int timeToMinutes();
 
 #endif

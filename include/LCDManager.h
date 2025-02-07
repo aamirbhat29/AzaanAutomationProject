@@ -2,6 +2,9 @@
 #define LCD_MANAGER_H
 
 #include <Arduino.h> 
+#include <LiquidCrystal_I2C.h>
+
+extern LiquidCrystal_I2C lcd;
 
 void initializeLCD();
 void displayMessage(String message);

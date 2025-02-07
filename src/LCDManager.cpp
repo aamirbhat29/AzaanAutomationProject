@@ -11,7 +11,7 @@
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void initializeLCD() {
-  Wire.begin(21, 22);  // Make sure your SDA/SCL pins are correctly set
+  Wire.begin(22, 21);  // Make sure your SDA/SCL pins are correctly set
   lcd.begin(16, 2);
   lcd.backlight();
   lcd.clear();
@@ -54,9 +54,15 @@ void displayTime(String currentTime) {
   }
   lcd.clear();  // Clear the screen before displaying time
   lcd.print(time12Hour);  // Display the current time
-  lcd.setCursor(7, 0);
+  lcd.setCursor(8, 0);
   lcd.print(prayerName);
+  //Serial.println(time12Hour);
+  //Serial.println(prayerName);
   lcd.print(currentPrayerTimeToDisplay); 
+  //Serial.println(currentPrayerTimeToDisplay);
+  prayerDataUpdated = false; // Reset the flag after displaying
+  // Serial.println("Displaying prayerName: " + prayerName);
+  // Serial.println("Displaying currentPrayerTimeToDisplay: " + currentPrayerTimeToDisplay);
 }
 
 
