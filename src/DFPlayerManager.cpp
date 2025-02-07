@@ -30,6 +30,11 @@ void playAzaanDemoTest()
     simulateButtonPress();
 }
 
+int getVolume() {
+    int volume = myDFPlayer.readVolume();  // Get the current volume (0-30)
+    return volume;
+}
+
 void setupDFPlayer()
 {
   FPSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
@@ -53,7 +58,7 @@ void setupDFPlayer()
 
   if (initialized) {
     Serial.println("DFPlayer Mini detected.");
-    myDFPlayer.volume(15);             // Set volume (0-30)
+    myDFPlayer.volume(5);             // Set volume (0-30)
     myDFPlayer.EQ(DFPLAYER_EQ_NORMAL); // Set EQ mode
   } else {
     Serial.println("Unable to initialize DFPlayer Mini after 3 attempts.");

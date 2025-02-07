@@ -20,6 +20,9 @@ void setup() {
   // Initialize the LCD
   initializeLCD();
 
+// // Initialize the IR remote
+//   initializeIR();
+
   // Print a welcome message on the LCD
   displayMessage("Welcome...");
   //pinMode(14, OUTPUT);
@@ -52,12 +55,11 @@ void setup() {
 
   // Initialize DFPlayer
   setupDFPlayer();
-
   // Sync time
   //syncTimeWithMultipleServers();
 
   // Fetch prayer times
-  //fetchPrayerTimes();
+  fetchPrayerTimes();
 
   // Testing Azaan
   //playAzaanDemoTest();
@@ -71,6 +73,13 @@ void loop() {
    handleTimeSync();
   unsigned long currentMillis = millis();
 
+
+  // Check for Azaan every 10 seconds
+  if (currentMillis - lastAzaanCheckTime >= 10000) {
+    lastAzaanCheckTime = currentMillis;
+    checkAndTriggerAzaan();
+  }
+
   // Update LCD every second
   if (currentMillis - lastLCDUpdateTime >= 1000) {
     lastLCDUpdateTime = currentMillis;
@@ -78,13 +87,7 @@ void loop() {
     displayTime(currentTime);
     //displayPT();
       // Read DHT11 data and display with scrolling
-    displayDHT11Data();  // Display sensor data on the second row
+    //displayDHT11Data();  // Display sensor data on the second row
     
-  }
-
-  // Check for Azaan every 10 seconds
-  if (currentMillis - lastAzaanCheckTime >= 10000) {
-    lastAzaanCheckTime = currentMillis;
-    checkAndTriggerAzaan();
   }
 }
