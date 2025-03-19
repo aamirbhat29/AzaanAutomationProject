@@ -9,7 +9,7 @@
 
 // Define the pin and sensor type
 // Pin Definitions
-#define DHTPIN 35  // GPIO2 for the DHT sensor
+#define DHTPIN 26  // GPIO2 for the DHT sensor
 #define DHTTYPE DHT11
 
 // Create DHT sensor object
