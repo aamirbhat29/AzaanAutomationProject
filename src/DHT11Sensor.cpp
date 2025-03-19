@@ -18,7 +18,9 @@ void displayDHT11Data() {
   // Read humidity and temperature
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
-
+// Serial.println("in DHT11: ");
+// Serial.println(humidity);
+// Serial.println(temperature);
   // Retry up to 5 times if the sensor fails to read
   while ((isnan(humidity) || isnan(temperature)) && attempts < 5) {
     humidity = dht.readHumidity();

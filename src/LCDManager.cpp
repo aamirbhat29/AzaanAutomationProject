@@ -6,15 +6,21 @@
 #include <RCTManager.h>
 #include "AzaanTimes.h"
 
-
-// Define lcd here only
+// Define LCD instance
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+// External variables
+extern String currentPrayerTimeToDisplay;
+extern String prayerName;
+extern bool timeSynced;
+extern bool prayerDataUpdated;
+
+// Initialize LCD
 void initializeLCD() {
-  Wire.begin(22, 21);  // Make sure your SDA/SCL pins are correctly set
-  lcd.begin(16, 2);
-  lcd.backlight();
-  lcd.clear();
+    Wire.begin(22, 21);  // Ensure correct SDA/SCL pins
+    lcd.begin(16, 2);
+    lcd.backlight();
+    lcd.clear();
 }
 
 void displayMessage(String message) {
@@ -23,61 +29,51 @@ void displayMessage(String message) {
   lcd.print(message);
 }
 
- extern String currentPrayerName[];
- extern String prayerName;
-// Main function to display time on the LCD
-void displayTime(String currentTime) {
-  int hour = currentTime.substring(0, 2).toInt();  // Extract the hour part
-  String minute = currentTime.substring(3, 5);     // Extract the minute part
-  
-  String period = "AM";
-  
-  // Convert to 12-hour format
-  if (hour >= 12) {
-    period = "PM";
-    if (hour > 12) {
-      hour -= 12;  // Convert hour to 12-hour format
+// Modified helper function to convert 24-hour time to 12-hour format with optional period
+String convertTo12HourFormat(String time24, bool includePeriod = true) {
+    int hour = time24.substring(0, 2).toInt();
+    String minute = time24.substring(3, 5);
+    String period = "AM";
+    
+    if (hour >= 12) {
+        period = "PM";
+        if (hour > 12) {
+            hour -= 12;
+        }
+    } else if (hour == 0) {
+        hour = 12;
     }
-  } else if (hour == 0) {
-    hour = 12; // Handle midnight (00:00) case
-  }
-
-  // Format the hour and minute back into a string with the period
-  String time12Hour = String(hour) + ":" + minute + period;
-
-  lcd.clear();  // Clear the screen before displaying time
-  lcd.setCursor(0, 0);
-  if (!timeSynced) {
-    lcd.print("RTC: ");  // Indicate RTC time is being used
-  } else {
-    lcd.print("Time: ");  // Indicate synced time is being used
-  }
-  lcd.clear();  // Clear the screen before displaying time
-  lcd.print(time12Hour);  // Display the current time
-  lcd.setCursor(8, 0);
-  lcd.print(prayerName);
-  //Serial.println(time12Hour);
-  //Serial.println(prayerName);
-  lcd.print(currentPrayerTimeToDisplay); 
-  //Serial.println(currentPrayerTimeToDisplay);
-  prayerDataUpdated = false; // Reset the flag after displaying
-  // Serial.println("Displaying prayerName: " + prayerName);
-  // Serial.println("Displaying currentPrayerTimeToDisplay: " + currentPrayerTimeToDisplay);
+    
+    String result = String(hour) + ":" + minute;
+    if (includePeriod) {
+        result += " " + period;
+    }
+    return result;
 }
 
-
-// void displayPT(String pT) {
-//    // Check if the current prayer is already displayed
-//     // Update the index of the last displayed prayer
-//     //lastDisplayedPrayerIndex = prayerIndex;
-
-//     // Clear the LCD and display the current prayer name and time
-//     //lcd.clear();
-//     lcd.setCursor(9, 0);
-//     lcd.print("ASR");
-//     lcd.setCursor(11, 0);
-//     lcd.print(pT);
-// }
-
-
-
+// Function to display time and prayer information
+void displayTime(String currentTime) {
+    String time12Hour = convertTo12HourFormat(currentTime, false); // Includes period
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    // if (!timeSynced) {
+    //     lcd.print("RTC: ");
+    // } else {
+    //     lcd.print("Time: ");
+    // }
+    // lcd.clear();
+    lcd.print(time12Hour);
+    
+    lcd.setCursor(6, 0);
+    // Convert prayer time to 12-hour format without period
+    //Serial.println("hello " + currentPrayerTimeToDisplay);
+    String prayerTime12Hour = convertTo12HourFormat(currentPrayerTimeToDisplay, false);
+    lcd.print(prayerName + " " + prayerTime12Hour);
+    
+    // Debug output
+    //Serial.println("Time: " + time12Hour);
+    //Serial.println("Prayer: " + prayerName + " " + prayerTime12Hour);
+    
+    prayerDataUpdated = false; // Reset update flag
+}

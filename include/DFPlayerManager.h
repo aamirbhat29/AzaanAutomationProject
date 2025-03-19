@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <DFRobotDFPlayerMini.h>
 #include <HardwareSerial.h>
+#include <SoftwareSerial.h>
 
 #define RX_PIN 16  // RX pin connected to DFPlayer TX
 #define TX_PIN 17  // TX pin connected to DFPlayer RX
@@ -13,8 +14,15 @@
     void setupDFPlayer();
     void playAzaan(int trackNumber);
     int getVolume();
+    int getVolumeManually();
+    void increaseVolume();
+    void decreaseVolume();
+    void resetDFPlayer();
+    void checkDFPlayerStatus();
+    extern int dfplayerResetFlag;  // Extern variable from main.cpp
     extern int currentTrack;
     extern HardwareSerial FPSerial;  // Declare FPSerial
+    extern SoftwareSerial mySerial;
     extern DFRobotDFPlayerMini myDFPlayer;  // Declare myDFPlayer
 
 

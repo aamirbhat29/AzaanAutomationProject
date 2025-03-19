@@ -8,13 +8,16 @@
 const char* ssid = "Airtel_aami_8816";
 const char* password = "air88659"; // Wrong password for testing
 
+// const char* ssid = "ACTFIBERNET";
+// const char* password = "act12345"; // Wrong password for testing
+
 // Web Server on Port 80
 AsyncWebServer server(80);
 
 bool wifiConnecting = false;  // Wi-Fi connection attempt flag
 
 void setupWiFi() {
-  Serial.begin(115200);
+  //Serial.begin(115200);
   WiFi.begin(ssid, password);
   Serial.println("Connecting to Wi-Fi...");
 

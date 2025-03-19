@@ -23,7 +23,7 @@ unsigned long volumeDisplayTime = 0;
 // Initialize the IR receiver
 void initializeIR() {
     IrRceiver.enableIRIn();  // Initialize the IR receiver
-    Serial.begin(115200);
+    //Serial.begin(115200);
     Serial.println("Initialized IR remote");
     lcd.begin(16, 2);  // Initialize the LCD
     lcd.print("IR Remote Ready");
