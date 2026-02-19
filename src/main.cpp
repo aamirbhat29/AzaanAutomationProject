@@ -24,13 +24,16 @@ void setup()
   displayMessage("Welcome...");
   delay(1000);
 
-  // Initialize RTC (may fail if not connected, that's okay)
+  // Initialize RTC
   initializeRTC();
 
   // Initialize LED Manager
   beginLEDManager();
 
-  // Attempt to connect to Wi-Fi
+  // Initialize DHT11 sensor
+  initializeDHT();
+
+  // Connect to Wi-Fi
   displayMessage("WiFi...");
   setupWiFi();
 
@@ -55,15 +58,18 @@ void setup()
   setupDFPlayer();
   delay(1000);
 
-  // *** FETCH PRAYER TIMES ON BOOT ***
+  // Fetch prayer times on boot
   displayMessage("Get Prayers...");
   Serial.println("\n=== Fetching Prayer Times on Boot ===");
   fetchPrayerTimes();
   delay(2000);
 
-  // *** INITIALIZE PRAYER NAME/TIME FOR DISPLAY ***
-  checkAndTriggerAzaan(); //
-  Serial.println("Prayer name set for display");
+  // Initialize prayer name/time for display
+  checkAndTriggerAzaan();
+  Serial.print("Next prayer: ");
+  Serial.print(prayerName);
+  Serial.print(" at ");
+  Serial.println(currentPrayerTimeToDisplay);
 
   // Clear LCD for main display
   lcd.clear();
@@ -73,8 +79,11 @@ void setup()
 
 void loop()
 {
-  // Wifi LED State control
+  // WiFi LED state control
   handleWifiLEDState();
+
+  // Maintain WiFi connection
+  maintainWiFiConnection();
 
   // Periodic time sync
   handleTimeSync();
@@ -87,11 +96,8 @@ void loop()
     lastLCDUpdateTime = currentMillis;
 
     currentTime = getCurrentTime();
-    Serial.print("[LOOP] Time: ");
-    Serial.println(currentTime);
-
     displayTime(currentTime);
-    displayDHT11Data();
+    // displayDHT11Data();  // Uncomment when DHT11 is connected
   }
 
   // Check for Azaan every 10 seconds

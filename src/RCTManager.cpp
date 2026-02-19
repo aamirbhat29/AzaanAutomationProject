@@ -8,50 +8,102 @@
 // RTC and NTP client initialization
 RTC_DS3231 rtc;
 WiFiUDP udp;
-NTPClient timeClient(udp, "pool.ntp.org", 0, 60000);  // NTP client setup, GMT offset 0 (for UTC)
+NTPClient timeClient(udp, "pool.ntp.org", 0, 60000);
+
+// Track if RTC is actually available
+bool rtcAvailable = false;
 
 // Initialize the RTC
-void initializeRTC() {
-  if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC. Please check the connections.");
+void initializeRTC()
+{
+  Serial.println("Checking for RTC module...");
+
+  if (!rtc.begin())
+  {
+    Serial.println("⚠ RTC not detected - will rely on NTP time only");
+    rtcAvailable = false;
+    return;
   }
 
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, setting time.");
-    setRTC();  // Set RTC to compile-time if power is lost
+  rtcAvailable = true;
+  Serial.println("✓ RTC module detected");
+
+  if (rtc.lostPower())
+  {
+    Serial.println("RTC lost power, will sync with NTP when available");
   }
 }
 
 // Set RTC with compile-time if no sync is found
-void setRTC() {
-  rtc.adjust(DateTime(2025, 1, 1, 0, 0, 0));  // Set RTC to compile time
-  Serial.println("RTC time set to compile-time.");
+void setRTC()
+{
+  if (!rtcAvailable)
+  {
+    Serial.println("RTC not available, cannot set time");
+    return;
+  }
+
+  rtc.adjust(DateTime(2025, 1, 1, 0, 0, 0));
+  Serial.println("RTC time set to default.");
 }
 
-
 // Sync RTC time with NTP
-void syncTimeWithNTP() {
-  if (WiFi.status() == WL_CONNECTED) {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // Set NTP servers
+void syncTimeWithNTP()
+{
+  if (!rtcAvailable)
+  {
+    // RTC not available, nothing to sync
+    return;
+  }
+
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      Serial.println("Time synchronized with NTP");
+    if (getLocalTime(&timeinfo))
+    {
+      Serial.println("Syncing NTP time to RTC...");
       rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1,
                           timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min,
                           timeinfo.tm_sec));
-    } else {
-      Serial.println("Failed to synchronize with NTP");
+      Serial.println("✓ RTC synchronized with NTP");
+    }
+    else
+    {
+      Serial.println("Failed to get NTP time for RTC sync");
     }
   }
 }
 
-// Get the current RTC time
-DateTime getCurrentRTC() {
-  return rtc.now();  // Return current time from RTC
+// Get the current RTC time (with safety check)
+DateTime getCurrentRTC()
+{
+  if (!rtcAvailable)
+  {
+    // Return a default/invalid time if RTC not available
+    // The calling code should check timeSynced flag instead
+    return DateTime(2000, 1, 1, 0, 0, 0);
+  }
+
+  return rtc.now();
 }
 
-// New method to initialize RTC and get the current time
-DateTime initializeAndGetRTC() {
-  initializeRTC();  // Initialize RTC and set time if needed
-  return getCurrentRTC();  // Return the current time from RTC after initialization
+// Initialize RTC and get the current time
+DateTime initializeAndGetRTC()
+{
+  initializeRTC();
+
+  if (!rtcAvailable)
+  {
+    Serial.println("RTC not available, returning default time");
+    return DateTime(2000, 1, 1, 0, 0, 0);
+  }
+
+  return getCurrentRTC();
+}
+
+// Check if RTC is available
+bool isRTCAvailable()
+{
+  return rtcAvailable;
 }

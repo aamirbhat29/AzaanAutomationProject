@@ -14,13 +14,41 @@ String otherPrayerTimes[] = {"12:45", "16:30", "18:00", "20:31"};
 String ipstackKey = "fd070d6f9a4c085dfe619ce5f12a19c1";
 String ipstackAPI = "http://api.ipstack.com/check?access_key=" + ipstackKey;
 String azaanTimeAPIKey = "b91f004f7f391b4f380805620a179d44";
-
-// FIXED: Changed to Srinagar (you're in Kashmir!)
-String location = "Srinagar%2C%20India"; // Was: Delhi%2C%20India
+String location = "Srinagar%2C%20India";
 
 bool prayerTimesFetched = false;
 bool prayerTimesUpdateAttempted = false;
 int fetchRetryCount = 0;
+
+// Helper function to add minutes to a time string
+String addMinutesToTime(String timeStr, int minutesToAdd)
+{
+  int hour = timeStr.substring(0, 2).toInt();
+  int minute = timeStr.substring(3, 5).toInt();
+
+  minute += minutesToAdd;
+
+  // Handle minute overflow/underflow
+  while (minute >= 60)
+  {
+    minute -= 60;
+    hour += 1;
+  }
+  while (minute < 0)
+  {
+    minute += 60;
+    hour -= 1;
+  }
+
+  // Handle hour overflow/underflow
+  if (hour >= 24)
+    hour -= 24;
+  if (hour < 0)
+    hour += 24;
+
+  String result = (hour < 10 ? "0" : "") + String(hour) + ":" + (minute < 10 ? "0" : "") + String(minute);
+  return result;
+}
 
 void fetchPrayerTimes()
 {
@@ -43,23 +71,19 @@ void fetchAzaanTimes()
     String currentDate;
     String loc;
     unsigned long startTime = millis();
+    const unsigned long timeout = 3000;
 
-    // FIXED: Reduced timeout from 10 seconds to 3 seconds
-    const unsigned long timeout = 3000; // 3 seconds timeout
-
-    // Retry logic with timeout
     while (currentDate == "" && millis() - startTime < timeout)
     {
       currentDate = getCurrentDate();
       if (currentDate != "")
         break;
-      delay(300); // Wait 300ms before retrying (was 500ms)
+      delay(300);
     }
 
     if (currentDate == "")
     {
       Serial.println("Unable to fetch current date after timeout. Using RTC fallback...");
-      // Try one more time with RTC directly
       DateTime now = rtc.now();
       char dateStr[11];
       snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", now.year(), now.month(), now.day());
@@ -74,20 +98,19 @@ void fetchAzaanTimes()
 
     String formattedDate = currentDate.substring(8, 10) + "-" + currentDate.substring(5, 7) + "-" + currentDate.substring(0, 4);
 
-    // FIXED: Changed timezone from UTC to Asia/Kolkata (IST)
     String curlAPI = "https://api.aladhan.com/v1/timingsByAddress/" + formattedDate +
                      "?address=" + location +
                      "&x7xapikey=" + azaanTimeAPIKey +
                      "&method=3&shafaq=general&tune=4%2C0%2C0%2C0%2C0%2C0%2C0%2C4%2C-6" +
                      "&school=1&midnightMode=0" +
-                     "&timezonestring=Asia/Kolkata" + // CHANGED: Was UTC!
+                     "&timezonestring=Asia/Kolkata" +
                      "&calendarMethod=UAQ";
 
     Serial.println("Current Date: " + currentDate);
     Serial.println("Constructed API URL: " + curlAPI);
 
     HTTPClient http;
-    http.setTimeout(5000); // ADDED: 5 second HTTP timeout
+    http.setTimeout(5000);
     http.begin(curlAPI);
 
     int httpResponseCode = http.GET();
@@ -136,7 +159,6 @@ bool parsePrayerTimes(String responseBody)
     return false;
   }
 
-  // Parse and update prayer times
   fajrTime = doc["data"]["timings"]["Fajr"].as<String>();
   otherPrayerTimes[0] = doc["data"]["timings"]["Dhuhr"].as<String>();
   otherPrayerTimes[1] = doc["data"]["timings"]["Asr"].as<String>();
@@ -168,7 +190,7 @@ void checkAndTriggerAzaan()
   String currentTime = getCurrentTime();
   String currentTimeWithoutSeconds = currentTime.substring(0, 5);
 
-  // IMPROVED: Fetch prayer times at 2:00 AM with better error handling
+  // Fetch prayer times at 2:00 AM
   if (currentTimeWithoutSeconds == "02:00" && !prayerTimesUpdateAttempted)
   {
     Serial.println("=== Daily Prayer Times Update (2:00 AM) ===");
@@ -189,7 +211,7 @@ void checkAndTriggerAzaan()
         Serial.print("Retry ");
         Serial.print(fetchRetryCount);
         Serial.println("/3 to fetch prayer times...");
-        delay(2000); // Wait 2 seconds before retrying (was 5)
+        delay(2000);
       }
     }
 
@@ -207,7 +229,7 @@ void checkAndTriggerAzaan()
     prayerTimesUpdateAttempted = false;
   }
 
-  // Determine current/next prayer
+  // Determine current/next prayer for display
   if (currentTimeWithoutSeconds < fajrTime)
   {
     prayerName = currentPrayerName[0];
@@ -234,30 +256,56 @@ void checkAndTriggerAzaan()
     currentPrayerTimeToDisplay = otherPrayerTimes[3];
   }
 
-  // Check if it's time for a prayer
-  if (currentTimeWithoutSeconds == fajrTime)
+  // Calculate Suhoor time (50 minutes before Fajr)
+  String suhoorTime = addMinutesToTime(fajrTime, -50);
+
+  // Calculate Maghrib azaan time (1 minute after Maghrib)
+  String maghribAzaanTime = addMinutesToTime(otherPrayerTimes[2], 1);
+
+  // Check if it's time for Suhoor alarm or prayers
+  if (currentTimeWithoutSeconds == suhoorTime)
   {
-    Serial.println("Time for Fajr Azaan!");
-    playAzaan(1);
+    Serial.println("=== TIME FOR SUHOOR ALARM ===");
+    Serial.print("Suhoor time: ");
+    Serial.print(suhoorTime);
+    Serial.print(" (50 min before Fajr at ");
+    Serial.print(fajrTime);
+    Serial.println(")");
+    playAzaan(7); // Track 7 - Suhoor wake up sound
+  }
+  else if (currentTimeWithoutSeconds == fajrTime)
+  {
+    Serial.println("=== TIME FOR FAJR AZAAN ===");
+    playAzaan(1); // Track 1 - Fajr azaan
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[0])
   {
-    Serial.println("Time for Dhuhr Azaan!");
-    playAzaan(2);
+    Serial.println("=== TIME FOR DHUHR AZAAN ===");
+    playAzaan(2); // Track 2 - Dhuhr azaan
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[1])
   {
-    Serial.println("Time for Asr Azaan!");
-    playAzaan(2);
+    Serial.println("=== TIME FOR ASR AZAAN ===");
+    playAzaan(3); // Track 3 - Asr azaan
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[2])
   {
-    Serial.println("Time for Maghrib Azaan!");
-    playAzaan(2);
+    Serial.println("=== TIME FOR MAGHRIB - IFTAR ===");
+    playAzaan(4); // Track 4 - Iftar/breaking fast sound
+  }
+  else if (currentTimeWithoutSeconds == maghribAzaanTime)
+  {
+    Serial.println("=== TIME FOR MAGHRIB AZAAN ===");
+    Serial.print("Maghrib azaan at ");
+    Serial.print(maghribAzaanTime);
+    Serial.print(" (1 min after Maghrib at ");
+    Serial.print(otherPrayerTimes[2]);
+    Serial.println(")");
+    playAzaan(5); // Track 5 - Maghrib azaan
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[3])
   {
-    Serial.println("Time for Isha Azaan!");
-    playAzaan(2);
+    Serial.println("=== TIME FOR ISHA AZAAN ===");
+    playAzaan(6); // Track 6 - Isha azaan
   }
 }
