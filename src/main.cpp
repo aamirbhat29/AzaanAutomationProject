@@ -8,82 +8,117 @@
 #include "RCTManager.h"
 #include "DHT11Sensor.h"
 #include "LEDManager.h"
+#include <WiFi.h>
 
 // Global Variables
 unsigned long lastLCDUpdateTime = 0;
 unsigned long lastAzaanCheckTime = 0;
 String currentTime = "";
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
+  Serial.println("\n\n=== ESP32 Azaan System Starting ===");
 
   // Initialize the LCD
   initializeLCD();
-
-  // Print a welcome message on the LCD
   displayMessage("Welcome...");
-  //pinMode(14, OUTPUT);
+  delay(1000);
+
+  // Initialize RTC
   initializeRTC();
 
-  beginLEDManager();  // Initialize LED pin
-  setupWiFi();        // Attempt to connect to Wi-Fi
+  // Initialize LED Manager
+  beginLEDManager();
 
-  // Sync time
+  // Initialize DHT11 sensor
+  initializeDHT();
+
+  // Connect to Wi-Fi
+  displayMessage("WiFi...");
+  setupWiFi();
+
+  // Display connected WiFi SSID
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    String ssid = WiFi.SSID();
+    displayMessage("WiFi: " + ssid);
+    Serial.print("Connected to: ");
+    Serial.println(ssid);
+    delay(3000); // Show WiFi name for 3 seconds
+  }
+  else
+  {
+    displayMessage("WiFi Failed");
+    delay(2000);
+  }
+
+  // Sync time with NTP
+  displayMessage("Time Sync...");
   syncTimeWithMultipleServers();
 
-  // Update LCD based on the time sync status
-  if (timeSynced) {
+  if (timeSynced)
+  {
     displayMessage("Time Synced!");
-  } else {
-    displayMessage("RTC Fallback");
+    Serial.println("✓ Time synchronized successfully");
   }
-   delay(2000);  // Show the status message for 2 seconds
-
-  // Start displaying time on the LCD
-  lcd.clear();  // Clear the LCD screen before showing time
-  // Display the current time from RTC (or NTP if synced)
- 
-
-//uncomment after adding battery to RTC module
-  // Put ESP32 into deep sleep mode to save power
-  // Serial.println("Going to deep sleep...");
-  // esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME);
-  // esp_deep_sleep_start();
+  else
+  {
+    displayMessage("RTC Fallback");
+    Serial.println("⚠ Using RTC time");
+  }
+  delay(1500);
 
   // Initialize DFPlayer
+  displayMessage("Audio Init...");
   setupDFPlayer();
+  delay(1000);
 
-  // Sync time
-  //syncTimeWithMultipleServers();
+  // Fetch prayer times on boot
+  displayMessage("Get Prayers...");
+  Serial.println("\n=== Fetching Prayer Times on Boot ===");
+  fetchPrayerTimes();
+  delay(2000);
 
-  // Fetch prayer times
-  //fetchPrayerTimes();
+  // Initialize prayer name/time for display
+  checkAndTriggerAzaan();
+  Serial.print("Next prayer: ");
+  Serial.print(prayerName);
+  Serial.print(" at ");
+  Serial.println(currentPrayerTimeToDisplay);
 
-  // Testing Azaan
-  //playAzaanDemoTest();
+  // Clear LCD for main display
+  lcd.clear();
+  Serial.println("=== Setup Complete ===");
+  Serial.println("Entering main loop...\n");
 }
 
-void loop() {
- //Wifi LED State control
- handleWifiLEDState();
+void loop()
+{
+  // WiFi LED state control
+  handleWifiLEDState();
 
- // Time sync with multiple NTP servers
-   handleTimeSync();
+  // Maintain WiFi connection
+  maintainWiFiConnection();
+
+  // Periodic time sync
+  handleTimeSync();
+
   unsigned long currentMillis = millis();
 
   // Update LCD every second
-  if (currentMillis - lastLCDUpdateTime >= 1000) {
+  if (currentMillis - lastLCDUpdateTime >= 1000)
+  {
     lastLCDUpdateTime = currentMillis;
-     currentTime = getCurrentTime();  // Update the current time
+
+    currentTime = getCurrentTime();
     displayTime(currentTime);
-    //displayPT();
-      // Read DHT11 data and display with scrolling
-    displayDHT11Data();  // Display sensor data on the second row
-    
+    displayDHT11Data();
   }
 
   // Check for Azaan every 10 seconds
-  if (currentMillis - lastAzaanCheckTime >= 10000) {
+  if (currentMillis - lastAzaanCheckTime >= 10000)
+  {
     lastAzaanCheckTime = currentMillis;
     checkAndTriggerAzaan();
   }

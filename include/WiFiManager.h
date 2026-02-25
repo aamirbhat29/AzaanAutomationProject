@@ -2,5 +2,6 @@
 #define WIFI_MANAGER_H
 
 void setupWiFi();
+void maintainWiFiConnection();
 
 #endif
