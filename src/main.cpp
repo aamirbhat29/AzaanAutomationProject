@@ -8,6 +8,7 @@
 #include "RCTManager.h"
 #include "DHT11Sensor.h"
 #include "LEDManager.h"
+#include <WiFi.h>
 
 // Global Variables
 unsigned long lastLCDUpdateTime = 0;
@@ -36,6 +37,21 @@ void setup()
   // Connect to Wi-Fi
   displayMessage("WiFi...");
   setupWiFi();
+
+  // Display connected WiFi SSID
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    String ssid = WiFi.SSID();
+    displayMessage("WiFi: " + ssid);
+    Serial.print("Connected to: ");
+    Serial.println(ssid);
+    delay(3000); // Show WiFi name for 3 seconds
+  }
+  else
+  {
+    displayMessage("WiFi Failed");
+    delay(2000);
+  }
 
   // Sync time with NTP
   displayMessage("Time Sync...");
@@ -97,7 +113,7 @@ void loop()
 
     currentTime = getCurrentTime();
     displayTime(currentTime);
-    // displayDHT11Data();  // Uncomment when DHT11 is connected
+    displayDHT11Data();
   }
 
   // Check for Azaan every 10 seconds

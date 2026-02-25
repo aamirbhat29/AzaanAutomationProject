@@ -1,7 +1,7 @@
 #ifndef AZAAN_TIMES_H
 #define AZAAN_TIMES_H
 
-#include <Arduino.h> 
+#include <Arduino.h>
 
 extern String fajrTime;
 extern String otherPrayerTimes[4];
@@ -19,6 +19,7 @@ bool parsePrayerTimes(String responseBody);
 void simulateButtonPress();
 void fetchAzaanTimes();
 void displayNextPrayerTime();
+void fetchTomorrowFajr();
 int getCurrentPrayerIndex();
 String getCurrentPrayerName();
 

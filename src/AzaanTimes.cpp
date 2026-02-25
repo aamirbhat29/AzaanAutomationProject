@@ -16,6 +16,9 @@ String ipstackAPI = "http://api.ipstack.com/check?access_key=" + ipstackKey;
 String azaanTimeAPIKey = "b91f004f7f391b4f380805620a179d44";
 String location = "Srinagar%2C%20India";
 
+// Store next day's Fajr time
+String nextDayFajrTime = "05:48"; // Will be updated
+
 bool prayerTimesFetched = false;
 bool prayerTimesUpdateAttempted = false;
 int fetchRetryCount = 0;
@@ -28,7 +31,6 @@ String addMinutesToTime(String timeStr, int minutesToAdd)
 
   minute += minutesToAdd;
 
-  // Handle minute overflow/underflow
   while (minute >= 60)
   {
     minute -= 60;
@@ -40,7 +42,6 @@ String addMinutesToTime(String timeStr, int minutesToAdd)
     hour -= 1;
   }
 
-  // Handle hour overflow/underflow
   if (hour >= 24)
     hour -= 24;
   if (hour < 0)
@@ -55,7 +56,6 @@ void fetchPrayerTimes()
   Serial.println("Fetching Azaan times from API...");
   delay(1000);
   fetchAzaanTimes();
-  // Print updated times
   Serial.println("Azaan times updated:");
   Serial.println("Fajr: " + fajrTime);
   for (int i = 0; i < 4; i++)
@@ -127,6 +127,9 @@ void fetchAzaanTimes()
       {
         prayerTimesFetched = true;
         Serial.println("✓ Prayer times successfully fetched and parsed!");
+
+        // Also fetch tomorrow's Fajr time for display after Isha
+        fetchTomorrowFajr();
       }
       else
       {
@@ -145,6 +148,92 @@ void fetchAzaanTimes()
   {
     Serial.println("WiFi is disconnected. Cannot fetch prayer times. Using offline times.");
   }
+}
+
+// NEW: Fetch tomorrow's Fajr time
+void fetchTomorrowFajr()
+{
+  if ((WiFi.status() != WL_CONNECTED))
+  {
+    Serial.println("WiFi not connected, cannot fetch tomorrow's Fajr");
+    nextDayFajrTime = ""; // Mark as failed
+    return;
+  }
+
+  Serial.println("Fetching tomorrow's Fajr time...");
+
+  char tomorrowDate[11];
+
+  // Try RTC first
+  if (isRTCAvailable())
+  {
+    Serial.println("Using RTC for tomorrow's date calculation");
+    DateTime now = rtc.now();
+    DateTime tomorrow = DateTime(now.unixtime() + 86400); // Add 86400 seconds (1 day)
+    snprintf(tomorrowDate, sizeof(tomorrowDate), "%02d-%02d-%04d",
+             tomorrow.day(), tomorrow.month(), tomorrow.year());
+  }
+  // Fallback to NTP
+  else
+  {
+    Serial.println("RTC not available, using NTP for tomorrow's date");
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo))
+    {
+      Serial.println("Failed to get time from NTP for tomorrow's date");
+      nextDayFajrTime = ""; // Mark as failed
+      return;
+    }
+
+    // Add 1 day to current time
+    time_t now = mktime(&timeinfo);
+    now += 86400; // Add 1 day in seconds
+    struct tm *tomorrow = localtime(&now);
+
+    snprintf(tomorrowDate, sizeof(tomorrowDate), "%02d-%02d-%04d",
+             tomorrow->tm_mday, tomorrow->tm_mon + 1, tomorrow->tm_year + 1900);
+  }
+
+  String curlAPI = "https://api.aladhan.com/v1/timingsByAddress/" + String(tomorrowDate) +
+                   "?address=" + location +
+                   "&x7xapikey=" + azaanTimeAPIKey +
+                   "&method=3&shafaq=general&tune=4%2C0%2C0%2C0%2C0%2C0%2C0%2C4%2C-6" +
+                   "&school=1&midnightMode=0" +
+                   "&timezonestring=Asia/Kolkata" +
+                   "&calendarMethod=UAQ";
+
+  HTTPClient http;
+  http.setTimeout(5000);
+  http.begin(curlAPI);
+
+  int httpResponseCode = http.GET();
+
+  if (httpResponseCode == 200)
+  {
+    String responseBody = http.getString();
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, responseBody);
+
+    if (!error)
+    {
+      nextDayFajrTime = doc["data"]["timings"]["Fajr"].as<String>();
+      Serial.print("✓ Tomorrow's Fajr: ");
+      Serial.println(nextDayFajrTime);
+    }
+    else
+    {
+      Serial.println("✗ Failed to parse tomorrow's Fajr JSON");
+      nextDayFajrTime = ""; // Mark as failed
+    }
+  }
+  else
+  {
+    Serial.print("✗ Failed to fetch tomorrow's Fajr. HTTP code: ");
+    Serial.println(httpResponseCode);
+    nextDayFajrTime = ""; // Mark as failed
+  }
+
+  http.end();
 }
 
 bool parsePrayerTimes(String responseBody)
@@ -223,7 +312,6 @@ void checkAndTriggerAzaan()
     prayerTimesUpdateAttempted = true;
   }
 
-  // Reset the flag after 2:01 AM
   if (currentTimeWithoutSeconds == "02:01")
   {
     prayerTimesUpdateAttempted = false;
@@ -232,10 +320,11 @@ void checkAndTriggerAzaan()
   // Determine current/next prayer for display
   if (currentTimeWithoutSeconds < fajrTime)
   {
+    // Before today's Fajr - show today's Fajr
     prayerName = currentPrayerName[0];
     currentPrayerTimeToDisplay = fajrTime;
   }
-  else if (currentTimeWithoutSeconds <= otherPrayerTimes[0] && currentTimeWithoutSeconds > fajrTime)
+  else if (currentTimeWithoutSeconds <= otherPrayerTimes[0] && currentTimeWithoutSeconds >= fajrTime)
   {
     prayerName = currentPrayerName[1];
     currentPrayerTimeToDisplay = otherPrayerTimes[0];
@@ -250,62 +339,68 @@ void checkAndTriggerAzaan()
     prayerName = currentPrayerName[3];
     currentPrayerTimeToDisplay = otherPrayerTimes[2];
   }
-  else if (currentTimeWithoutSeconds > otherPrayerTimes[2] && currentTimeWithoutSeconds < "23:59")
+  else if (currentTimeWithoutSeconds <= otherPrayerTimes[3] && currentTimeWithoutSeconds > otherPrayerTimes[2])
   {
     prayerName = currentPrayerName[4];
     currentPrayerTimeToDisplay = otherPrayerTimes[3];
   }
+  else
+  {
+    // AFTER Isha (past 19:41) until midnight - show TOMORROW's Fajr
+    prayerName = currentPrayerName[0];
 
-  // Calculate Suhoor time (50 minutes before Fajr)
+    // Use tomorrow's Fajr if we have it
+    if (nextDayFajrTime != "05:48" && nextDayFajrTime != "")
+    {
+      currentPrayerTimeToDisplay = nextDayFajrTime;
+    }
+    else
+    {
+      // ERROR: Could not fetch tomorrow's Fajr (WiFi/RTC both failed)
+      prayerName = "Err";
+      currentPrayerTimeToDisplay = "404";
+      Serial.println("ERROR: Could not fetch tomorrow's Fajr - showing error on display");
+    }
+  }
+
+  // Calculate times for special prayers
   String suhoorTime = addMinutesToTime(fajrTime, -50);
-
-  // Calculate Maghrib azaan time (1 minute after Maghrib)
   String maghribAzaanTime = addMinutesToTime(otherPrayerTimes[2], 1);
 
   // Check if it's time for Suhoor alarm or prayers
   if (currentTimeWithoutSeconds == suhoorTime)
   {
     Serial.println("=== TIME FOR SUHOOR ALARM ===");
-    Serial.print("Suhoor time: ");
-    Serial.print(suhoorTime);
-    Serial.print(" (50 min before Fajr at ");
-    Serial.print(fajrTime);
-    Serial.println(")");
-    playAzaan(7); // Track 7 - Suhoor wake up sound
+    playAzaan(7);
   }
   else if (currentTimeWithoutSeconds == fajrTime)
   {
     Serial.println("=== TIME FOR FAJR AZAAN ===");
-    playAzaan(1); // Track 1 - Fajr azaan
+    playAzaan(1);
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[0])
   {
     Serial.println("=== TIME FOR DHUHR AZAAN ===");
-    playAzaan(2); // Track 2 - Dhuhr azaan
+    playAzaan(2);
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[1])
   {
     Serial.println("=== TIME FOR ASR AZAAN ===");
-    playAzaan(3); // Track 3 - Asr azaan
+    playAzaan(3);
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[2])
   {
     Serial.println("=== TIME FOR MAGHRIB - IFTAR ===");
-    playAzaan(4); // Track 4 - Iftar/breaking fast sound
+    playAzaan(4);
   }
   else if (currentTimeWithoutSeconds == maghribAzaanTime)
   {
     Serial.println("=== TIME FOR MAGHRIB AZAAN ===");
-    Serial.print("Maghrib azaan at ");
-    Serial.print(maghribAzaanTime);
-    Serial.print(" (1 min after Maghrib at ");
-    Serial.print(otherPrayerTimes[2]);
-    Serial.println(")");
-    playAzaan(5); // Track 5 - Maghrib azaan
+    playAzaan(5);
   }
   else if (currentTimeWithoutSeconds == otherPrayerTimes[3])
   {
     Serial.println("=== TIME FOR ISHA AZAAN ===");
-    playAzaan(6); // Track 6 - Isha azaan
+    playAzaan(6);
   }
 }

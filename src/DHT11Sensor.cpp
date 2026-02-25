@@ -1,56 +1,57 @@
 #include "DHT11Sensor.h"
 #include "LCDManager.h"
 
-extern LiquidCrystal_I2C lcd; // Declare lcd as external
-// Initialize the DHT sensor
+extern LiquidCrystal_I2C lcd;
+extern void updateDHTValues(float temp, float hum);
+
 DHT dht(DHTPIN, DHTTYPE);
+
+bool dhtWorking = false;
 
 void initializeDHT()
 {
   dht.begin();
+
+  float testRead = dht.readTemperature();
+  if (!isnan(testRead))
+  {
+    dhtWorking = true;
+    Serial.println("✓ DHT11 sensor detected and working");
+  }
+  else
+  {
+    dhtWorking = false;
+    Serial.println("⚠ DHT11 sensor not detected");
+  }
 }
 
 void displayDHT11Data()
 {
-  float humidity = NAN;
-  float temperature = NAN;
+  if (!dhtWorking)
+  {
+    return;
+  }
+
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
 
   int attempts = 0;
-  // Read humidity and temperature
-  humidity = dht.readHumidity();
-  temperature = dht.readTemperature();
-  // Retry up to 5 times if the sensor fails to read
-  while ((isnan(humidity) || isnan(temperature)) && attempts < 5)
+  while ((isnan(humidity) || isnan(temperature)) && attempts < 3)
   {
     humidity = dht.readHumidity();
     temperature = dht.readTemperature();
     attempts++;
-    delay(1000);
+    delay(500);
   }
 
-  // If sensor fails, show error message
   if (isnan(humidity) || isnan(temperature))
   {
-    lcd.setCursor(0, 1);
-    lcd.print("Err"); // Display error if sensor data is invalid
+    dhtWorking = false;
+    return;
   }
   else
   {
-    // Format temperature and humidity strings
-    String tempStr = String(temperature, 1);
-    String humidityStr = String(humidity, 1);
-
-    // Display temperature with degree symbol
-    lcd.print("                "); // Clear line
-    lcd.setCursor(0, 1);
-    lcd.print(tempStr);
-    lcd.print((char)223); // Degree symbol
-    lcd.print("C");
-
-    // Display humidity with percentage symbol
-    lcd.setCursor(8, 1);
-    lcd.print(humidityStr);
-    lcd.print("%");
-    delay(1000);
+    // Pass values to LCD manager for display
+    updateDHTValues(temperature, humidity);
   }
 }
